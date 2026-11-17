@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chat</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1c1915;
+      --muted: #6b645c;
+      --paper: #f6f3ee;
+      --line: #e2dbd1;
+      --user: #efe8dc;
+      --accent: #1f4d3a;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      display: flex;
+      overflow: hidden;
+      background: var(--paper);
+      color: var(--ink);
+      font: 17px/1.5 ui-sans-serif, system-ui, sans-serif;
+    }
+    aside {
+      width: 15.5rem;
+      height: 100%;
+      flex: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      min-height: 0;
+      padding: 1rem 0.75rem;
+      border-right: 1px solid var(--line);
+      background: #efeae3;
+    }
+    #chats {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      overflow: auto;
+    }
+    main {
+      flex: 1;
+      min-width: 0;
+      height: 100%;
+      overflow-y: auto;
+    }
+    .thread {
+      max-width: 40rem;
+      margin: 0 auto;
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+      padding: 1.5rem 1rem 0;
+    }
+    h1 {
+      margin: 0 0 1rem;
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+    @media (max-width: 720px) {
+      body { flex-direction: column; }
+      aside {
+        width: auto;
+        height: auto;
+        max-height: 12rem;
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+      main { height: auto; min-height: 0; }
+      .thread { min-height: 100%; }
+    }
+    #transcript {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      padding-bottom: 1rem;
+    }
+    .turn {
+      overflow-wrap: anywhere;
+    }
+    .user {
+      align-self: flex-end;
+      max-width: 85%;
+      white-space: pre-wrap;
+      background: var(--user);
+      border-radius: 0.75rem;
+      padding: 0.6rem 0.8rem;
+    }
+    .assistant {
+      align-self: stretch;
+    }
+    .assistant > :first-child { margin-top: 0; }
+    .assistant > :last-child { margin-bottom: 0; }
+    .assistant p { margin: 0.45rem 0; }
+    .assistant h1, .assistant h2, .assistant h3 {
+      margin: 0.9rem 0 0.3rem;
+      font-size: 1.05rem;
+      line-height: 1.3;
+    }
+    .assistant ul, .assistant ol { margin: 0.35rem 0; padding-left: 1.25rem; }
+    .assistant li + li { margin-top: 0.15rem; }
+    .assistant a { color: var(--accent); }
+    .assistant blockquote {
+      margin: 0.45rem 0;
+      padding-left: 0.75rem;
+      border-left: 2px solid var(--line);
+      color: var(--muted);
+    }
+    .assistant pre {
+      margin: 0.5rem 0;
+      padding: 0.65rem 0.75rem;
+      overflow-x: auto;
+      background: white;
+      border: 1px solid var(--line);
+      border-radius: 0.5rem;
+      font: 0.85rem/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    .assistant code {
+      font: 0.9em ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      background: white;
+      border-radius: 0.25rem;
+      padding: 0.05em 0.3em;
+    }
+    .assistant pre code { background: none; padding: 0; }
+    .assistant table {
+      width: 100%;
+      margin: 0.5rem 0;
+      border-collapse: collapse;
+      font-size: 0.95rem;
+    }
+    .assistant th, .assistant td {
+      border: 1px solid var(--line);
+      padding: 0.3rem 0.5rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    .assistant th { background: white; font-weight: 600; }
+    .sources {
+      margin-top: 0.95rem;
+      padding-top: 0.7rem;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+    .sources h2 {
+      margin: 0 0 0.35rem;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .sources ul { margin: 0; padding-left: 1.1rem; }
+    .sources a { color: var(--accent); }
+    .status {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    form {
+      position: sticky;
+      bottom: 0;
+      display: flex;
+      gap: 0.5rem;
+      padding: 0.75rem 0 1rem;
+      background: linear-gradient(to top, var(--paper) 70%, transparent);
+    }
+    textarea {
+      flex: 1;
+      resize: none;
+      min-height: 2.75rem;
+      max-height: 8rem;
+      border: 1px solid var(--line);
+      border-radius: 0.6rem;
+      padding: 0.6rem 0.75rem;
+      font: inherit;
+      color: inherit;
+      background: white;
+    }
+    button {
+      border: 0;
+      border-radius: 0.6rem;
+      font: inherit;
+      cursor: pointer;
+    }
+    #new-chat, form button {
+      background: var(--accent);
+      color: white;
+    }
+    #new-chat { padding: 0.45rem 0.75rem; }
+    form button { padding: 0 1rem; }
+    button.chat {
+      width: 100%;
+      text-align: left;
+      padding: 0.4rem 0.65rem;
+      background: transparent;
+      color: var(--ink);
+      font-size: 0.92rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    button.chat.active { background: white; }
+    button:disabled { opacity: 0.5; cursor: default; }
+  </style>
+</head>
+<body>
+  <aside>
+    <button id="new-chat" type="button">New chat</button>
+    <nav id="chats" aria-label="Saved chats"></nav>
+  </aside>
+  <main>
+    <div class="thread">
+      <h1 id="title">New chat</h1>
+      <div id="transcript"></div>
+      <form id="composer">
+        <textarea id="message" rows="1" placeholder="Message" autofocus></textarea>
+        <button type="submit">Send</button>
+      </form>
+    </div>
+  </main>
+  <script>
+    const transcript = document.querySelector("#transcript");
+    const form = document.querySelector("#composer");
+    const message = document.querySelector("#message");
+    const button = form.querySelector("button");
+    const chatsEl = document.querySelector("#chats");
+    const titleEl = document.querySelector("#title");
+    let chats = [];
+    let currentId = null;
+    let view = 0;
+
+    button.disabled = true;
+    boot()
+      .catch(() => openDraft())
+      .finally(() => {
+        button.disabled = false;
+        message.focus();
+      });
+
+    document.querySelector("#new-chat").addEventListener("click", () => {
+      if (currentId === null && transcript.childElementCount === 0) {
+        message.focus();
+        return;
+      }
+      openDraft();
+    });
+
+    message.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        form.requestSubmit();
+      }
+    });
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const text = message.value.trim();
+      if (!text || button.disabled) return;
+      const token = view;
+      const started = currentId;
+      message.value = "";
+      button.disabled = true;
+      add("user", text);
+      const assistant = add("assistant", "");
+      const status = add("status", "");
+      try {
+        const response = await fetch("/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: text, chatId: started }),
+        });
+        if (!response.ok || !response.body) throw new Error(await errorText(response));
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        while (true) {
+          const chunk = await reader.read();
+          if (chunk.done) break;
+          buffer += decoder.decode(chunk.value, { stream: true });
+          let split = buffer.indexOf("\n\n");
+          while (split !== -1) {
+            apply(buffer.slice(0, split), assistant, status, token);
+            buffer = buffer.slice(split + 2);
+            split = buffer.indexOf("\n\n");
+          }
+        }
+      } catch (error) {
+        if (token === view) status.textContent = error instanceof Error ? error.message : "The reply failed.";
+      } finally {
+        if (token === view) {
+          if (!status.textContent) status.remove();
+          button.disabled = false;
+          message.focus();
+        }
+      }
+    });
+
+    async function boot() {
+      await refreshChats();
+      if (chats.length > 0) await openChat(chats[0].id);
+      else openDraft();
+    }
+
+    function openDraft() {
+      view += 1;
+      currentId = null;
+      titleEl.textContent = "New chat";
+      transcript.replaceChildren();
+      renderChats();
+      button.disabled = false;
+      message.focus();
+    }
+
+    async function openChat(id) {
+      const token = ++view;
+      currentId = id;
+      const chat = chats.find((item) => item.id === id);
+      titleEl.textContent = chat ? chat.title : "Chat";
+      transcript.replaceChildren();
+      renderChats();
+      button.disabled = false;
+      const response = await fetch(`/messages?chat=${id}`);
+      if (token !== view) return;
+      if (!response.ok) throw new Error("That chat could not be opened.");
+      const messages = await response.json();
+      if (token !== view || !Array.isArray(messages)) return;
+      for (const item of messages) {
+        if (!item || (item.role !== "user" && item.role !== "assistant")) continue;
+        if (typeof item.content !== "string" || !item.content.trim()) continue;
+        add(item.role, item.content);
+      }
+    }
+
+    async function refreshChats() {
+      const response = await fetch("/chats");
+      if (!response.ok) return;
+      const body = await response.json();
+      if (!Array.isArray(body)) return;
+      chats = body.filter((chat) => chat && typeof chat.id === "number" && typeof chat.title === "string");
+      renderChats();
+    }
+
+    function renderChats() {
+      chatsEl.replaceChildren();
+      for (const chat of chats) {
+        const node = document.createElement("button");
+        node.type = "button";
+        node.className = chat.id === currentId ? "chat active" : "chat";
+        node.textContent = chat.title;
+        node.title = chat.title;
+        if (chat.id === currentId) node.setAttribute("aria-current", "true");
+        node.addEventListener("click", () => {
+          if (chat.id !== currentId) openChat(chat.id).catch(() => {});
+        });
+        chatsEl.append(node);
+      }
+    }
+
+    function noteChat(payload) {
+      if (!payload || typeof payload.id !== "number" || typeof payload.title !== "string") return;
+      const existing = chats.find((chat) => chat.id === payload.id);
+      if (existing) existing.title = payload.title;
+      else chats.unshift({ id: payload.id, title: payload.title });
+      renderChats();
+    }
+
+    async function errorText(response) {
+      try {
+        const body = await response.json();
+        if (body && typeof body.error === "string") return body.error;
+      } catch { /* The status line is enough. */ }
+      return "The reply failed.";
+    }
+
+    function add(kind, text) {
+      const node = document.createElement("div");
+      node.className = kind === "status" ? "status" : `turn ${kind}`;
+      if (kind === "assistant") paint(node, text);
+      else node.textContent = text;
+      transcript.append(node);
+      node.scrollIntoView({ block: "end" });
+      return node;
+    }
+
+    function paint(node, markdown) {
+      node.dataset.md = markdown;
+      node.innerHTML = renderMarkdown(markdown);
+    }
+
+    function apply(raw, assistant, status, token) {
+      let event = "message";
+      let data = "";
+      for (const line of raw.split("\n")) {
+        if (line.startsWith("event:")) event = line.slice(6).trim();
+        if (line.startsWith("data:")) data += line.slice(5).trim();
+      }
+      if (!data) return;
+      const payload = JSON.parse(data);
+      if (event === "chat") {
+        noteChat(payload);
+        if (token === view && currentId === null) currentId = payload.id;
+        if (token === view && payload.title) titleEl.textContent = payload.title;
+        renderChats();
+        return;
+      }
+      if (event === "done") {
+        refreshChats().catch(() => {});
+        return;
+      }
+      if (token !== view) return;
+      if (event === "status") status.textContent = payload.tool;
+      if (event === "delta") {
+        status.textContent = "";
+        paint(assistant, (assistant.dataset.md || "") + payload.text);
+        assistant.scrollIntoView({ block: "end" });
+      }
+      if (event === "error") status.textContent = payload.message;
+    }
+
+    function renderMarkdown(source) {
+      const lines = String(source).replace(/\r\n/g, "\n").split("\n");
+      const blocks = [];
+      let i = 0;
+      while (i < lines.length) {
+        const line = lines[i];
+        if (line.trim() === "") { i += 1; continue; }
+        if (line.startsWith("```")) {
+          const body = [];
+          i += 1;
+          while (i < lines.length && !lines[i].startsWith("```")) {
+            body.push(lines[i]);
+            i += 1;
+          }
+          if (i < lines.length) i += 1;
+          blocks.push(`<pre><code>${escapeHtml(body.join("\n"))}</code></pre>`);
+          continue;
+        }
+        const heading = line.match(/^(#{1,3})\s+(.*)$/);
+        if (heading) {
+          const text = heading[2].trim();
+          i += 1;
+          if (text.toLowerCase() === "sources") {
+            while (i < lines.length && lines[i].trim() === "") i += 1;
+            const items = [];
+            while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) {
+              items.push(`<li>${renderInline(lines[i].replace(/^\s*[-*]\s+/, ""))}</li>`);
+              i += 1;
+            }
+            blocks.push(`<section class="sources"><h2>Sources</h2><ul>${items.join("")}</ul></section>`);
+            continue;
+          }
+          const level = heading[1].length;
+          blocks.push(`<h${level}>${renderInline(text)}</h${level}>`);
+          continue;
+        }
+        if (/^(-{3,}|\*{3,})$/.test(line.trim())) {
+          blocks.push("<hr>");
+          i += 1;
+          continue;
+        }
+        if (line.startsWith(">")) {
+          const quote = [];
+          while (i < lines.length && lines[i].startsWith(">")) {
+            quote.push(lines[i].replace(/^>\s?/, ""));
+            i += 1;
+          }
+          blocks.push(`<blockquote><p>${renderInline(quote.join(" "))}</p></blockquote>`);
+          continue;
+        }
+        if (/^\s*[-*]\s+/.test(line)) {
+          const list = renderList(lines, i, "ul", /^\s*[-*]\s+/);
+          blocks.push(list.html);
+          i = list.next;
+          continue;
+        }
+        if (/^\s*\d+\.\s+/.test(line)) {
+          const list = renderList(lines, i, "ol", /^\s*\d+\.\s+/);
+          blocks.push(list.html);
+          i = list.next;
+          continue;
+        }
+        if (line.includes("|") && isSeparator(lines[i + 1])) {
+          const header = splitRow(line);
+          i += 2;
+          const rows = [];
+          while (i < lines.length && lines[i].includes("|") && lines[i].trim() !== "") {
+            rows.push(`<tr>${splitRow(lines[i]).map((cell) => `<td>${renderInline(cell)}</td>`).join("")}</tr>`);
+            i += 1;
+          }
+          const head = `<tr>${header.map((cell) => `<th>${renderInline(cell)}</th>`).join("")}</tr>`;
+          blocks.push(`<table><thead>${head}</thead><tbody>${rows.join("")}</tbody></table>`);
+          continue;
+        }
+        const para = [line];
+        i += 1;
+        while (i < lines.length && lines[i].trim() !== "" && !isBlockStart(lines[i])) {
+          para.push(lines[i]);
+          i += 1;
+        }
+        blocks.push(`<p>${renderInline(para.join(" "))}</p>`);
+      }
+      return blocks.join("");
+    }
+
+    function renderList(lines, start, tag, pattern) {
+      const items = [];
+      let i = start;
+      while (i < lines.length && pattern.test(lines[i])) {
+        items.push(`<li>${renderInline(lines[i].replace(pattern, ""))}</li>`);
+        i += 1;
+      }
+      return { html: `<${tag}>${items.join("")}</${tag}>`, next: i };
+    }
+
+    function isBlockStart(line) {
+      return line.startsWith("```")
+        || /^(#{1,3})\s+/.test(line)
+        || line.startsWith(">")
+        || /^\s*[-*]\s+/.test(line)
+        || /^\s*\d+\.\s+/.test(line)
+        || /^(-{3,}|\*{3,})$/.test(line.trim());
+    }
+
+    function isSeparator(line) {
+      if (!line || !line.includes("-")) return false;
+      const cells = splitRow(line);
+      return cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/.test(cell));
+    }
+
+    function splitRow(line) {
+      return line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim());
+    }
+
+    function renderInline(text) {
+      let html = escapeHtml(text);
+      const codes = [];
+      html = html.replace(/`([^`]+)`/g, (_, code) => {
+        const token = `\u0000${codes.length}\u0000`;
+        codes.push(`<code>${code}</code>`);
+        return token;
+      });
+      html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (_, label, url) => {
+        return `<a href="${url}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+      });
+      html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+      html = html.replace(/__([^_]+)__/g, "<strong>$1</strong>");
+      html = html.replace(/(^|[\s(])\*([^*\n]+)\*(?=[\s).,;:!?]|$)/g, "$1<em>$2</em>");
+      html = html.replace(/(^|[\s(])_([^_\n]+)_(?=[\s).,;:!?]|$)/g, "$1<em>$2</em>");
+      html = html.replace(/\u0000(\d+)\u0000/g, (_, index) => codes[Number(index)]);
+      return html.split(/(<[^>]+>)/).map((part) => {
+        if (part.startsWith("<")) return part;
+        return part.replace(/(^|[\s(])(https?:\/\/[^\s<]+)/g, (_, lead, url) => {
+          const clean = url.replace(/[),.;:!?]+$/, "");
+          const tail = url.slice(clean.length);
+          return `${lead}<a href="${clean}" target="_blank" rel="noopener noreferrer">${clean}</a>${tail}`;
+        });
+      }).join("");
+    }
+
+    function escapeHtml(value) {
+      return value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+  </script>
+</body>
+</html>
